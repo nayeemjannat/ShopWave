@@ -26,9 +26,11 @@ out/
 server/.env
 server/.env.local
 server/.env.*
+!server/.env.example
 client/.env
 client/.env.local
 client/.env.*
+!client/.env.example
 
 # ============================================================
 # Logs

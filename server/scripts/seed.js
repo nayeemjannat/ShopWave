@@ -263,103 +263,112 @@ const buildProducts = (storeId) => {
   ];
 };
 
-const seedDatabase = async () => {
-  try {
+export const seedDatabase = async (options = {}) => {
+  const { closeConnection = true } = options;
+
+  if (mongoose.connection.readyState === 0) {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ MongoDB Connected');
-
-    let adminUser = await User.findOne({ email: 'admin@shopwave.com' });
-    let demoStore;
-
-    if (adminUser) {
-      console.log('⚠️  Super Admin already exists. Skipping user creation.');
-      demoStore = await Store.findOne({ slug: 'demo' });
-    } else {
-      adminUser = new User({
-        name: 'Nayeem',
-        email: 'admin@shopwave.com',
-        password: 'Admin@1234',
-        role: 'superAdmin',
-        phone: '+8801234567890',
-        isVerified: true,
-      });
-      await adminUser.save();
-      console.log(`✅ Super Admin Created: ${adminUser._id}`);
-
-      demoStore = new Store({
-        name: 'ShopWave Demo',
-        slug: 'demo',
-        owner: adminUser._id,
-        storeType: 'electronics',
-        config: {
-          primaryColor: '#4B44B0',
-          secondaryColor: '#1B9C75',
-          currency: 'BDT',
-          language: 'en',
-          // these are the modules ElectronicsLayout actually checks for
-          activeModules: ['wishlist', 'cart', 'comparison', 'flashSale', 'reviews', 'loyaltyPoints'],
-        },
-        payment: {
-          provider: 'sslcommerz',
-          storeId: 'demo_store_id',
-          storePassword: 'demo_store_password',
-          isLive: false,
-          cod: { enabled: true, fee: 20 },
-        },
-        isActive: true,
-      });
-      await demoStore.save();
-      console.log(`✅ Demo Store Created: ${demoStore._id}`);
-      console.log(`   Slug: ${demoStore.slug}`);
-      console.log(`   Owner: ${adminUser.email}`);
-    }
-
-    let demoCustomer = await User.findOne({ email: 'customer@shopwave.com' });
-    if (!demoCustomer) {
-      demoCustomer = new User({
-        name: 'Demo Customer',
-        email: 'customer@shopwave.com',
-        password: 'Customer@1234',
-        role: 'customer',
-        phone: '+8801987654321',
-        isVerified: true,
-      });
-      demoCustomer.referralCode = demoCustomer.generateReferralCode();
-      await demoCustomer.save();
-      console.log(`✅ Demo Customer Created: ${demoCustomer.email}`);
-    }
-
-    if (!demoStore) {
-      console.log('⚠️  Demo store not found — skipping product seeding.');
-    } else {
-      const existingCount = await Product.countDocuments({ store: demoStore._id });
-      if (existingCount > 0) {
-        console.log(`⚠️  ${existingCount} product(s) already exist for the demo store. Skipping product seeding.`);
-        console.log('   (Delete products manually or drop the collection if you want to reseed.)');
-      } else {
-        const products = buildProducts(demoStore._id);
-        await Product.insertMany(products);
-        const featuredCount = products.filter(p => p.isFeatured).length;
-        const flashCount = products.filter(p => p.flashSale?.active).length;
-        console.log(`✅ Seeded ${products.length} demo products`);
-        console.log(`   Featured: ${featuredCount} · Flash Sale: ${flashCount}`);
-        console.log(`   Categories: Smartphones, Laptops, Tablets, Accessories, Cameras, TV & Audio`);
-      }
-    }
-
-    console.log('\n🎉 Database seeding completed successfully!');
-    console.log('\nYou can now login with:');
-    console.log('   Email: admin@shopwave.com');
-    console.log('   Password: Admin@1234');
-    console.log('   Store Slug: demo');
-
-    await mongoose.connection.close();
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Seeding Error:', error.message);
-    await mongoose.connection.close();
-    process.exit(1);
   }
+
+  let adminUser = await User.findOne({ email: 'admin@shopwave.com' });
+  let demoStore;
+
+  if (adminUser) {
+    console.log('⚠️  Super Admin already exists. Skipping user creation.');
+    demoStore = await Store.findOne({ slug: 'demo' });
+  } else {
+    adminUser = new User({
+      name: 'Nayeem',
+      email: 'admin@shopwave.com',
+      password: 'Admin@1234',
+      role: 'superAdmin',
+      phone: '+8801234567890',
+      isVerified: true,
+    });
+    await adminUser.save();
+    console.log(`✅ Super Admin Created: ${adminUser._id}`);
+
+    demoStore = new Store({
+      name: 'ShopWave Demo',
+      slug: 'demo',
+      owner: adminUser._id,
+      storeType: 'electronics',
+      config: {
+        primaryColor: '#4B44B0',
+        secondaryColor: '#1B9C75',
+        currency: 'BDT',
+        language: 'en',
+        activeModules: ['wishlist', 'cart', 'comparison', 'flashSale', 'reviews', 'loyaltyPoints'],
+      },
+      payment: {
+        provider: 'sslcommerz',
+        storeId: 'demo_store_id',
+        storePassword: 'demo_store_password',
+        isLive: false,
+        cod: { enabled: true, fee: 20 },
+      },
+      isActive: true,
+    });
+    await demoStore.save();
+    console.log(`✅ Demo Store Created: ${demoStore._id}`);
+    console.log(`   Slug: ${demoStore.slug}`);
+    console.log(`   Owner: ${adminUser.email}`);
+  }
+
+  let demoCustomer = await User.findOne({ email: 'customer@shopwave.com' });
+  if (!demoCustomer) {
+    demoCustomer = new User({
+      name: 'Demo Customer',
+      email: 'customer@shopwave.com',
+      password: 'Customer@1234',
+      role: 'customer',
+      phone: '+8801987654321',
+      isVerified: true,
+    });
+    demoCustomer.referralCode = demoCustomer.generateReferralCode();
+    await demoCustomer.save();
+    console.log(`✅ Demo Customer Created: ${demoCustomer.email}`);
+  }
+
+  if (!demoStore) {
+    console.log('⚠️  Demo store not found — skipping product seeding.');
+  } else {
+    const existingCount = await Product.countDocuments({ store: demoStore._id });
+    if (existingCount > 0) {
+      console.log(`⚠️  ${existingCount} product(s) already exist for the demo store. Skipping product seeding.`);
+      console.log('   (Delete products manually or drop the collection if you want to reseed.)');
+    } else {
+      const products = buildProducts(demoStore._id);
+      await Product.insertMany(products);
+      const featuredCount = products.filter(p => p.isFeatured).length;
+      const flashCount = products.filter(p => p.flashSale?.active).length;
+      console.log(`✅ Seeded ${products.length} demo products`);
+      console.log(`   Featured: ${featuredCount} · Flash Sale: ${flashCount}`);
+      console.log(`   Categories: Smartphones, Laptops, Tablets, Accessories, Cameras, TV & Audio`);
+    }
+  }
+
+  console.log('\n🎉 Database seeding completed successfully!');
+  console.log('\nYou can now login with:');
+  console.log('   Email: admin@shopwave.com');
+  console.log('   Password: Admin@1234');
+  console.log('   Store Slug: demo');
+
+  if (closeConnection) {
+    await mongoose.connection.close();
+  }
+
+  return {
+    adminEmail: 'admin@shopwave.com',
+    password: 'Admin@1234',
+    storeSlug: 'demo',
+  };
 };
 
-seedDatabase();
+// Allow running directly: node scripts/seed.js
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
+  seedDatabase().catch((err) => { console.error(err); process.exit(1); });
+}
