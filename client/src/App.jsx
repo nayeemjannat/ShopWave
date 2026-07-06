@@ -94,10 +94,12 @@ function App() {
   useEffect(() => {
     // Resolve store slug from domain or environment
     const hostname = window.location.hostname;
-    let slug = '';
     const parts = hostname.split('.');
+    const knownPlatforms = ['vercel.app', 'onrender.com', 'netlify.app', 'railway.app', 'fly.dev', 'pages.dev'];
+    const isKnownPlatform = knownPlatforms.some(p => hostname.endsWith(p));
     
-    if (parts.length > 2 && parts[0] !== 'www') {
+    let slug = '';
+    if (parts.length > 2 && parts[0] !== 'www' && !isKnownPlatform) {
       slug = parts[0];
     } else {
       const urlParams = new URLSearchParams(window.location.search);
