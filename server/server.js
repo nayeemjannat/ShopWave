@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 
+import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { errorHandler } from './middleware/error.js';
 import { startCronJobs } from './utils/cronJobs.js';
@@ -82,7 +83,12 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-    startCronJobs();
+    // Only start cron jobs after the connection is fully open
+    if (mongoose.connection.readyState === 1) {
+      startCronJobs();
+    } else {
+      mongoose.connection.once('open', startCronJobs);
+    }
   });
 }).catch(err => {
   console.error('Failed to connect to MongoDB', err);
