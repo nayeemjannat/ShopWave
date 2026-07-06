@@ -48,5 +48,8 @@ export const orderSchema = Joi.object({
     postalCode: Joi.string().optional().allow('')
   }).required(),
   paymentMethod: Joi.string().valid('sslcommerz', 'cod').required(),
-  couponCode: Joi.string().optional().allow('')
+  couponCode: Joi.string().optional().allow(''),
+  storeId: Joi.string().required(),
+  shippingMethod: Joi.string().optional().allow(''),
+  shippingFee: Joi.number().optional().allow(null, '')
 });

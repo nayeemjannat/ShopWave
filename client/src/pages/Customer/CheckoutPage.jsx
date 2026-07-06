@@ -107,7 +107,14 @@ export const CheckoutPage = () => {
           quantity: item.quantity,
           price: item.price || item.product?.price
         })),
-        shippingAddress: address,
+        shippingAddress: {
+          fullName: address.fullName,
+          phone: address.phone,
+          address: address.streetAddress,
+          city: address.city,
+          district: address.district,
+          postalCode: address.postalCode
+        },
         paymentMethod,
         couponCode: appliedCoupon || undefined,
         storeId,
