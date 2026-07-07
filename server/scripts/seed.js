@@ -331,6 +331,46 @@ export const seedDatabase = async (options = {}) => {
     console.log(`✅ Demo Customer Created: ${demoCustomer.email}`);
   }
 
+  // Create a dedicated storeAdmin (Shop Owner) with their own store
+  let storeAdminUser = await User.findOne({ email: 'clothing@shopwave.com' });
+  let clothingStore;
+  if (!storeAdminUser) {
+    storeAdminUser = new User({
+      name: 'Clothing Store Admin',
+      email: 'clothing@shopwave.com',
+      password: 'StoreDemo@1234',
+      role: 'storeAdmin',
+      phone: '+8801712345678',
+      isVerified: true,
+    });
+    storeAdminUser.referralCode = storeAdminUser.generateReferralCode();
+    await storeAdminUser.save();
+    console.log(`✅ Store Admin Created: ${storeAdminUser.email}`);
+  }
+
+  if (storeAdminUser) {
+    clothingStore = await Store.findOne({ owner: storeAdminUser._id });
+    if (!clothingStore) {
+      clothingStore = new Store({
+        name: 'Fashion Hub',
+        slug: 'fashion-hub',
+        owner: storeAdminUser._id,
+        storeType: 'clothing',
+        config: {
+          primaryColor: '#E91E63',
+          secondaryColor: '#9C27B0',
+          currency: 'BDT',
+          language: 'en',
+          activeModules: ['wishlist', 'cart', 'comparison', 'reviews'],
+        },
+        isActive: true,
+      });
+      await clothingStore.save();
+      console.log(`✅ Clothing Store Created: ${clothingStore._id}`);
+      console.log(`   Slug: ${clothingStore.slug}`);
+    }
+  }
+
   if (!demoStore) {
     console.log('⚠️  Demo store not found — skipping product seeding.');
   } else {
@@ -350,19 +390,25 @@ export const seedDatabase = async (options = {}) => {
   }
 
   console.log('\n🎉 Database seeding completed successfully!');
-  console.log('\nYou can now login with:');
-  console.log('   Email: admin@shopwave.com');
-  console.log('   Password: Admin@1234');
-  console.log('   Store Slug: demo');
+  console.log('\nLogin credentials:');
+  console.log('   ── Super Admin ──');
+  console.log('      Email: admin@shopwave.com');
+  console.log('      Password: Admin@1234');
+  console.log('   ── Shop Owner ──');
+  console.log('      Email: clothing@shopwave.com');
+  console.log('      Password: StoreDemo@1234');
+  console.log('   ── Customer ──');
+  console.log('      Email: customer@shopwave.com');
+  console.log('      Password: Customer@1234');
 
   if (closeConnection) {
     await mongoose.connection.close();
   }
 
   return {
-    adminEmail: 'admin@shopwave.com',
-    password: 'Admin@1234',
-    storeSlug: 'demo',
+    superAdmin: { email: 'admin@shopwave.com', password: 'Admin@1234', storeSlug: 'demo' },
+    storeAdmin: { email: 'clothing@shopwave.com', password: 'StoreDemo@1234', storeSlug: 'fashion-hub' },
+    customer: { email: 'customer@shopwave.com', password: 'Customer@1234' },
   };
 };
 

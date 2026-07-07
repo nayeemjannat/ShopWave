@@ -133,18 +133,17 @@ export const deleteCoupon = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Coupon deleted successfully' });
 });
 
-export const getAnalytics = asyncHandler(async (req, res) => {
-  const store = await getOwnedStore(req.user);
-
-  const { period = '30d' } = req.query;
+const buildDateRange = (period) => {
   let startDate = new Date();
   if (period === '7d') startDate.setDate(startDate.getDate() - 7);
   else if (period === '30d') startDate.setDate(startDate.getDate() - 30);
   else if (period === '90d') startDate.setDate(startDate.getDate() - 90);
-  else startDate = new Date(0); // all time
+  else startDate = new Date(0);
+  return startDate;
+};
 
-  const matchStage = { store: store._id, createdAt: { $gte: startDate } };
-
+const buildAnalyticsResponse = async (matchStage) => {
+  // Revenue & orders
   const stats = await Order.aggregate([
     { $match: matchStage },
     {
@@ -163,10 +162,96 @@ export const getAnalytics = asyncHandler(async (req, res) => {
     totalOrders += s.count;
   });
 
-  res.status(200).json({
-    success: true,
-    analytics: { revenue: totalRevenue, orders: totalOrders }
-  });
+  // Orders by status
+  const ordersByStatus = await Order.aggregate([
+    { $match: matchStage },
+    { $group: { _id: '$orderStatus', count: { $sum: 1 } } },
+    { $project: { status: '$_id', count: 1, _id: 0 } }
+  ]);
+
+  // Daily revenue (last 7 days)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const dailyRevenue = await Order.aggregate([
+    { $match: { ...matchStage, createdAt: { $gte: sevenDaysAgo }, paymentStatus: 'paid' } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        revenue: { $sum: '$totalAmount' }
+      }
+    },
+    { $sort: { _id: 1 } },
+    { $project: { date: '$_id', revenue: 1, _id: 0 } }
+  ]);
+
+  // Top selling products
+  const topProducts = await Order.aggregate([
+    { $match: matchStage },
+    { $unwind: '$items' },
+    {
+      $group: {
+        _id: '$items.product',
+        unitsSold: { $sum: '$items.quantity' },
+        revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
+      }
+    },
+    { $sort: { unitsSold: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'products',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'product'
+      }
+    },
+    { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } }
+  ]);
+
+  // Recent orders
+  const recentOrders = await Order.find(matchStage)
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .populate('user', 'name email')
+    .lean();
+
+  return {
+    metrics: {
+      revenue: { total: totalRevenue, change: 0 },
+      orders: { total: totalOrders, change: 0 },
+      products: 0,
+      customers: { total: 0, change: 0 },
+    },
+    dailyRevenue,
+    ordersByStatus,
+    topProducts,
+    recentOrders,
+  };
+};
+
+export const getAnalytics = asyncHandler(async (req, res) => {
+  const store = await getOwnedStore(req.user);
+  const { period = '30d' } = req.query;
+  const startDate = buildDateRange(period);
+  const matchStage = { store: store._id, createdAt: { $gte: startDate } };
+
+  const analytics = await buildAnalyticsResponse(matchStage);
+  analytics.metrics.products = await Product.countDocuments({ store: store._id, isActive: true });
+  analytics.metrics.customers.total = await Order.distinct('user', { store: store._id }).then(u => u.length);
+
+  res.status(200).json({ success: true, ...analytics });
+});
+
+export const getGlobalAnalytics = asyncHandler(async (req, res) => {
+  const { period = '30d' } = req.query;
+  const startDate = buildDateRange(period);
+  const matchStage = { createdAt: { $gte: startDate } };
+
+  const analytics = await buildAnalyticsResponse(matchStage);
+  analytics.metrics.products = await Product.countDocuments({ isActive: true });
+  analytics.metrics.customers.total = await User.countDocuments({ role: 'customer' });
+  analytics.stores = await Store.countDocuments({ isActive: true });
+
+  res.status(200).json({ success: true, ...analytics });
 });
 
 export const createStore = asyncHandler(async (req, res) => {
