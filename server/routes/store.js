@@ -18,6 +18,7 @@ router.delete('/coupons/:id', authorize('storeAdmin', 'superAdmin'), deleteCoupo
 
 router.get('/all', authorize('superAdmin'), getAllStores);
 router.post('/', authorize('superAdmin'), createStoreWithAdmin);
+router.post('/assign', authorize('superAdmin'), createStore);
 router.get('/:id/payment', authorize('superAdmin'), getPaymentCredentials);
 router.put('/:id/payment', authorize('superAdmin'), updatePaymentCredentials);
 
