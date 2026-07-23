@@ -1,10 +1,10 @@
 import SSLCommerzPayment from 'sslcommerz-lts';
 
-const getStoreCredentials = (store) => {
+export const getStoreCredentials = (store) => {
   const { storeId, storePassword, isLive } = store.payment;
   return {
-    storeId: isLive ? storeId : process.env.SANDBOX_SSLCOMMERZ_STORE_ID,
-    storePassword: isLive ? storePassword : process.env.SANDBOX_SSLCOMMERZ_STORE_PASS,
+    storeId: isLive ? storeId : process.env.SSLCOMMERZ_STORE_ID,
+    storePassword: isLive ? storePassword : process.env.SSLCOMMERZ_STORE_PASSWORD,
     isLive,
   };
 };

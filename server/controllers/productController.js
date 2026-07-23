@@ -64,8 +64,8 @@ export const createProduct = asyncHandler(async (req, res) => {
   
   let dynamicFields = {};
   let variants = [];
-  if (req.body.dynamicFields) dynamicFields = JSON.parse(req.body.dynamicFields);
-  if (req.body.variants) variants = JSON.parse(req.body.variants);
+  if (req.body.dynamicFields) dynamicFields = typeof req.body.dynamicFields === 'string' ? JSON.parse(req.body.dynamicFields) : req.body.dynamicFields;
+  if (req.body.variants) variants = typeof req.body.variants === 'string' ? JSON.parse(req.body.variants) : req.body.variants;
 
   const product = new Product({
     ...req.body,

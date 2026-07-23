@@ -59,10 +59,6 @@ export const updateStoreConfig = asyncHandler(async (req, res) => {
     store.config = { ...store.config, ...configFields };
   }
 
-  if (req.body.storeType) {
-    store.storeType = req.body.storeType;
-  }
-
   await store.save();
   res.status(200).json({
     success: true,

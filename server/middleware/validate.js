@@ -21,7 +21,7 @@ export const loginSchema = Joi.object({
 
 export const productSchema = Joi.object({
   name: Joi.string().min(2).required(),
-  price: Joi.number().positive().required(),
+  price: Joi.number().min(0).required(),
   category: Joi.string().required(),
   stock: Joi.number().integer().min(0).required(),
   store: Joi.string().required(),
@@ -36,6 +36,23 @@ export const productSchema = Joi.object({
   tags: Joi.array().items(Joi.string()).optional(),
   flashSale: Joi.object().unknown(true).optional()
 });
+
+export const productUpdateSchema = Joi.object({
+  name: Joi.string().min(2),
+  price: Joi.number().min(0),
+  category: Joi.string(),
+  stock: Joi.number().integer().min(0),
+  description: Joi.string().max(2000).allow(''),
+  dynamicFields: Joi.object().unknown(true),
+  variants: Joi.array().items(Joi.object().unknown(true)),
+  nameBn: Joi.string().allow(''),
+  brand: Joi.string().allow(''),
+  images: Joi.array().items(Joi.string()),
+  sku: Joi.string().allow(''),
+  isFeatured: Joi.boolean(),
+  tags: Joi.array().items(Joi.string()),
+  flashSale: Joi.object().unknown(true)
+}).min(1);
 
 export const orderSchema = Joi.object({
   items: Joi.array().min(1).required(),

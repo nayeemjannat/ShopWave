@@ -36,6 +36,11 @@ export const login = asyncHandler(async (req, res) => {
     throw new Error('Invalid credentials');
   }
 
+  if (!user.isActive) {
+    res.status(403);
+    throw new Error('Account is deactivated. Contact support.');
+  }
+
   user.lastLogin = Date.now();
   await user.save();
 

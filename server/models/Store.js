@@ -15,9 +15,12 @@ const storeSchema = new mongoose.Schema(
       logo: { type: String },
       bannerImages: [{ type: String }],
       socialLinks: {
-        facebook: { type: String },
-        instagram: { type: String },
-        whatsapp: { type: String },
+        type: {
+          facebook: { type: String },
+          instagram: { type: String },
+          whatsapp: { type: String },
+        },
+        default: {},
       },
       activeModules: [{ type: String }],
       currency: { type: String, default: 'BDT' },
