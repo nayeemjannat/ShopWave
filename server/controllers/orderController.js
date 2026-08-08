@@ -242,27 +242,59 @@ export const getMyOrders = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, orders });
 });
 
-export const getOrderById = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id).populate('customer', 'name email').populate('items.product', 'name images price');
+const findAuthorizedOrder = async (orderId, user) => {
+  const order = await Order.findById(orderId).populate('customer', 'name email');
   if (!order) {
-    res.status(404);
-    throw new Error('Order not found');
+    const err = new Error('Order not found');
+    err.statusCode = 404;
+    throw err;
   }
 
-  if (order.customer._id.toString() !== req.user._id.toString() && req.user.role !== 'storeAdmin' && req.user.role !== 'superAdmin') {
-    res.status(403);
-    throw new Error('Not authorized to view this order');
+  if (order.customer._id.toString() !== user._id.toString() && user.role !== 'storeAdmin' && user.role !== 'superAdmin') {
+    const err = new Error('Not authorized to view this order');
+    err.statusCode = 403;
+    throw err;
   }
 
-  if (req.user.role === 'storeAdmin') {
-    const adminStoreId = await getAdminStoreId(req.user);
+  if (user.role === 'storeAdmin') {
+    const adminStoreId = await getAdminStoreId(user);
     if (order.store.toString() !== adminStoreId.toString()) {
-      res.status(403);
-      throw new Error('Not authorized to view this order');
+      const err = new Error('Not authorized to view this order');
+      err.statusCode = 403;
+      throw err;
     }
   }
 
+  return order;
+};
+
+export const getOrderById = asyncHandler(async (req, res) => {
+  const order = await findAuthorizedOrder(req.params.id, req.user).then((o) =>
+    Order.populate(o, { path: 'items.product', select: 'name images price' })
+  );
   res.status(200).json({ success: true, order });
+});
+
+export const getOrderInvoice = asyncHandler(async (req, res) => {
+  const order = await findAuthorizedOrder(req.params.id, req.user);
+  if (order.invoiceUrl) {
+    return res.status(200).json({ success: true, invoiceUrl: order.invoiceUrl });
+  }
+
+  const store = await Store.findById(order.store).populate('owner');
+  try {
+    const invoiceUrl = await generateOrderInvoice(order, store);
+    if (!invoiceUrl) {
+      res.status(500);
+      throw new Error('Invoice generation failed');
+    }
+    order.invoiceUrl = invoiceUrl;
+    await order.save();
+    res.status(200).json({ success: true, invoiceUrl });
+  } catch (err) {
+    res.status(500);
+    throw new Error('Invoice generation failed: ' + err.message);
+  }
 });
 
 export const cancelOrder = asyncHandler(async (req, res) => {

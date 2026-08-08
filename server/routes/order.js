@@ -1,5 +1,5 @@
 import express from 'express';
-import { placeOrder, sslcommerzSuccess, sslcommerzFailCancel, getMyOrders, getOrderById, cancelOrder, getAllOrders, updateOrderStatus, validateCoupon } from '../controllers/orderController.js';
+import { placeOrder, sslcommerzSuccess, sslcommerzFailCancel, getMyOrders, getOrderById, getOrderInvoice, cancelOrder, getAllOrders, updateOrderStatus, validateCoupon } from '../controllers/orderController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate, orderSchema } from '../middleware/validate.js';
 
@@ -14,6 +14,7 @@ router.use(protect);
 router.post('/validate-coupon', validateCoupon);
 router.post('/', validate(orderSchema), placeOrder);
 router.get('/myorders', getMyOrders);
+router.get('/:id/invoice', getOrderInvoice);
 router.get('/:id', getOrderById);
 router.put('/:id/cancel', cancelOrder);
 

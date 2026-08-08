@@ -25,6 +25,28 @@ export const OrderDetailPage = () => {
     fetchOrder();
   }, [id]);
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadInvoice = async () => {
+    if (order?.invoiceUrl) {
+      window.open(order.invoiceUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setIsDownloading(true);
+    try {
+      const res = await axiosInstance.get(`/api/v1/orders/${id}/invoice`);
+      if (res.success) {
+        window.open(res.invoiceUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('Invoice not available yet');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to generate invoice');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -65,16 +87,13 @@ export const OrderDetailPage = () => {
             {formatOrderStatus(order.status)}
           </span>
           <span className="text-xs text-gray-500">{formatDate(order.createdAt)}</span>
-          {order.invoiceUrl && (
-            <a
-              href={order.invoiceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90"
-            >
-              <span>⬇</span> Download Invoice
-            </a>
-          )}
+          <button
+            onClick={handleDownloadInvoice}
+            disabled={isDownloading}
+            className="inline-flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90 disabled:opacity-50"
+          >
+            <span>⬇</span> {isDownloading ? 'Generating...' : 'Download Invoice'}
+          </button>
         </div>
       </div>
 
