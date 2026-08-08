@@ -40,8 +40,9 @@ export const createReview = asyncHandler(async (req, res) => {
   const review = new Review({
     user: req.user._id,
     product: productId,
+    store: order.store,
     rating,
-    comment,
+    body: comment || req.body.body,
     isVerifiedPurchase: true,
     isApproved: false
   });

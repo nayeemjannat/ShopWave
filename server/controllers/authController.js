@@ -12,7 +12,17 @@ export const register = asyncHandler(async (req, res) => {
     throw new Error('Email already registered');
   }
 
-  const user = new User({ name, email, password });
+  let referredBy;
+  if (req.query.ref) {
+    const referrer = await User.findOne({ referralCode: req.query.ref });
+    if (!referrer) {
+      res.status(400);
+      throw new Error('Invalid referral code');
+    }
+    referredBy = referrer._id;
+  }
+
+  const user = new User({ name, email, password, referredBy });
   user.referralCode = user.generateReferralCode();
   await user.save();
 

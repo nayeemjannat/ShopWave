@@ -113,8 +113,8 @@ export const ProductCard = memo(({ product, showCompare = false }) => {
     e.stopPropagation();
     const list = getCompareItems();
     if (e.target.checked) {
-      if (list.length >= 4) {
-        toast.error('You can compare up to 4 products only.');
+      if (list.length >= 3) {
+        toast.error('You can compare up to 3 products only.');
         return;
       }
       const newList = [...list, product];

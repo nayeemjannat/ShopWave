@@ -4,11 +4,15 @@ import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { errorHandler } from './middleware/error.js';
 import { startCronJobs } from './utils/cronJobs.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import authRoutes from './routes/auth.js';
 import productRoutes from './routes/product.js';
@@ -36,6 +40,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
 
 // Prevent browser from caching API responses — fixes stale/304 empty-list bugs
 app.use('/api/v1', (req, res, next) => {

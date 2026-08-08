@@ -106,7 +106,7 @@ export const createCoupon = asyncHandler(async (req, res) => {
   const coupon = await Coupon.create({
     store: store._id,
     code: code.toUpperCase(),
-    discountType: discountType === 'percentage' ? 'percent' : 'flat',
+    discountType: (discountType === 'percentage' || discountType === 'percent') ? 'percent' : 'flat',
     value: Number(discountValue),
     minOrder: Number(minOrderAmount) || 0,
     expiresAt: new Date(endDate),
@@ -207,7 +207,7 @@ const buildAnalyticsResponse = async (matchStage) => {
   const recentOrders = await Order.find(matchStage)
     .sort({ createdAt: -1 })
     .limit(5)
-    .populate('user', 'name email')
+    .populate('customer', 'name email')
     .lean();
 
   return {

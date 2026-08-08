@@ -21,7 +21,7 @@ reviewSchema.index({ product: 1, user: 1 }, { unique: true });
 reviewSchema.statics.calculateAverageRating = async function (productId) {
   const obj = await this.aggregate([
     {
-      $match: { product: productId },
+      $match: { product: productId, isApproved: true },
     },
     {
       $group: {

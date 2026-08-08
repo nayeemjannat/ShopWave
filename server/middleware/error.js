@@ -10,8 +10,10 @@ export const errorHandler = (err, req, res, next) => {
 
   // Mongoose duplicate key
   if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
-    const message = `Duplicate field value: ${field}`;
+    const fields = Object.keys(err.keyValue);
+    const message = fields.length === 2 && fields.includes('code')
+      ? `A coupon with code "${err.keyValue.code}" already exists for this store`
+      : `Duplicate field value: ${fields.join(', ')}`;
     error = { message, statusCode: 400 };
   }
 
@@ -33,7 +35,7 @@ export const errorHandler = (err, req, res, next) => {
     error = { message, statusCode: 401 };
   }
 
-  const statusCode = error.statusCode || err.statusCode || 500;
+  const statusCode = error.statusCode || err.statusCode || (res.statusCode >= 400 ? res.statusCode : 500);
   const message = error.message || 'Server Error';
 
   res.status(statusCode).json({

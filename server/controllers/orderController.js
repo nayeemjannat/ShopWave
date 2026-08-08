@@ -5,8 +5,16 @@ import Cart from '../models/Cart.js';
 import Coupon from '../models/Coupon.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { initiatePayment, verifySSLCommerzPayment } from '../utils/paymentGateway.js';
+
+const ALLOWED_TRANSITIONS = {
+  pending: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+};
+const TERMINAL_STATES = ['delivered', 'cancelled'];
 import sendEmail, { orderConfirmationTemplate, orderShippedTemplate } from '../utils/sendEmail.js';
 import sendWhatsApp from '../utils/sendWhatsApp.js';
+import { generateOrderInvoice } from '../utils/invoiceGenerator.js';
 import Store from '../models/Store.js';
 
 const getAdminStoreId = async (user) => {
@@ -139,6 +147,17 @@ export const placeOrder = asyncHandler(async (req, res) => {
     });
 
     const store = await Store.findById(storeId).populate('owner');
+
+    try {
+      const invoiceUrl = await generateOrderInvoice(order, store);
+      if (invoiceUrl) {
+        order.invoiceUrl = invoiceUrl;
+        await order.save();
+      }
+    } catch (err) {
+      console.error('Invoice generation failed:', err.message);
+    }
+
     if (store?.socialLinks?.whatsapp) {
       const msg = `🛒 New Order Received!\nOrder #: ${order.orderNumber}\nCustomer: ${req.user.name}\nTotal: ৳${order.totalAmount}\nItems: ${order.items.length}\nPayment: ${order.paymentMethod.toUpperCase()}`;
       await sendWhatsApp({ to: store.socialLinks.whatsapp, message: msg });
@@ -185,7 +204,6 @@ export const sslcommerzSuccess = asyncHandler(async (req, res) => {
     order.paymentStatus = 'paid';
     order.transactionId = val_id;
     order.orderStatus = 'processing';
-    order.statusTimeline.push({ status: 'processing', timestamp: Date.now() });
     await order.save();
   } catch {
     return res.redirect(`${clientUrl}/order-failure`);
@@ -210,7 +228,6 @@ export const sslcommerzFailCancel = asyncHandler(async (req, res) => {
   if (order.paymentStatus !== 'paid') {
     order.paymentStatus = 'failed';
     order.orderStatus = 'cancelled';
-    order.statusTimeline.push({ status: 'cancelled', timestamp: Date.now() });
     await order.save();
     await restoreOrderStock(order);
   }
@@ -219,7 +236,9 @@ export const sslcommerzFailCancel = asyncHandler(async (req, res) => {
 });
 
 export const getMyOrders = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ customer: req.user._id }).populate('items.product', 'name images price');
+  const orders = await Order.find({ customer: req.user._id })
+    .sort({ createdAt: -1 })
+    .populate('items.product', 'name images price');
   res.status(200).json({ success: true, orders });
 });
 
@@ -264,7 +283,6 @@ export const cancelOrder = asyncHandler(async (req, res) => {
   }
 
   order.orderStatus = 'cancelled';
-  order.statusTimeline.push({ status: 'cancelled', timestamp: Date.now() });
   await order.save();
   await restoreOrderStock(order);
 
@@ -297,13 +315,27 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
   const adminStoreId = await getAdminStoreId(req.user);
   if (adminStoreId && order.store.toString() !== adminStoreId.toString()) {
-    res.status(403);
-    throw new Error('Not authorized to update this order');
+    const err = new Error('Not authorized to update this order');
+    err.statusCode = 403;
+    throw err;
   }
 
   const { status } = req.body;
+
+  if (TERMINAL_STATES.includes(order.orderStatus)) {
+    const err = new Error(`Order is already ${order.orderStatus}. No further transitions allowed.`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const allowed = ALLOWED_TRANSITIONS[order.orderStatus];
+  if (!allowed || !allowed.includes(status)) {
+    const err = new Error(`Invalid status transition from "${order.orderStatus}" to "${status}". Allowed: ${(allowed || ['none']).join(', ')}.`);
+    err.statusCode = 400;
+    throw err;
+  }
+
   order.orderStatus = status;
-  order.statusTimeline.push({ status, timestamp: Date.now() });
   await order.save();
 
   if (status === 'shipped' && order.customer) {
