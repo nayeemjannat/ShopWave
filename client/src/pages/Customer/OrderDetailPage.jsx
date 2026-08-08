@@ -65,6 +65,16 @@ export const OrderDetailPage = () => {
             {formatOrderStatus(order.status)}
           </span>
           <span className="text-xs text-gray-500">{formatDate(order.createdAt)}</span>
+          {order.invoiceUrl && (
+            <a
+              href={order.invoiceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90"
+            >
+              <span>⬇</span> Download Invoice
+            </a>
+          )}
         </div>
       </div>
 
