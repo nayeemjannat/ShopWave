@@ -4,12 +4,16 @@
 
 const mockOrderFindById = jest.fn();
 const mockOrderSave = jest.fn();
+const mockOrderCountDocuments = jest.fn();
 const mockUserFindById = jest.fn();
 const mockUserFindByIdAndUpdate = jest.fn();
 const mockUserCountDocuments = jest.fn();
 
 jest.unstable_mockModule('../models/Order.js', () => ({
-  default: { findById: (...args) => mockOrderFindById(...args) },
+  default: {
+    findById: (...args) => mockOrderFindById(...args),
+    countDocuments: (...args) => mockOrderCountDocuments(...args),
+  },
 }));
 
 jest.unstable_mockModule('../models/User.js', () => ({
@@ -156,6 +160,9 @@ describe('updateOrderStatus — grants loyalty points on delivered (Phase 8)', (
     };
     order.populate = jest.fn().mockReturnValue(order);
     mockOrderFindById.mockReturnValue(order);
+    const customerDoc = { _id: 'user1', referredBy: null };
+    customerDoc.select = jest.fn().mockReturnValue(customerDoc);
+    mockUserFindById.mockReturnValue(customerDoc);
 
     await updateOrderStatus(mockRequest({ body: { status: 'delivered' } }), res, next);
 
@@ -201,6 +208,90 @@ describe('updateOrderStatus — grants loyalty points on delivered (Phase 8)', (
     await updateOrderStatus(mockRequest({ body: { status: 'shipped' } }), res, next);
 
     expect(mockUserFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+/* =============================================================
+   PHASE 8 — referral first-order bonus (write logic)
+   When a referred customer's FIRST order is delivered, the
+   referrer gets a 100-pt bonus. Second+ orders → no bonus.
+   ============================================================= */
+
+describe('updateOrderStatus — referral first-order credit (Phase 8)', () => {
+  let res, next;
+  const makeOrder = (customer = { _id: 'user1' }) => {
+    const order = {
+      _id: 'order1',
+      store: 'store1',
+      orderStatus: 'shipped',
+      totalAmount: 800,
+      customer,
+      save: mockOrderSave.mockResolvedValue(true),
+    };
+    order.populate = jest.fn().mockReturnValue(order);
+    mockOrderFindById.mockReturnValue(order);
+    return order;
+  };
+  const makeCustomer = (referredBy) => {
+    const doc = { _id: 'user1', referredBy };
+    doc.select = jest.fn().mockReturnValue(doc);
+    mockUserFindById.mockReturnValue(doc);
+    return doc;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    res = mockResponse();
+    next = jest.fn();
+  });
+
+  test('referred customer first delivered order → referrer credited 100 pts + history', async () => {
+    makeOrder();
+    makeCustomer('ref1');
+    mockOrderCountDocuments.mockResolvedValue(1);
+
+    await updateOrderStatus(mockRequest({ body: { status: 'delivered' } }), res, next);
+
+    expect(mockUserFindById).toHaveBeenCalledWith('user1');
+    expect(mockOrderCountDocuments).toHaveBeenCalledWith({
+      customer: 'user1',
+      orderStatus: 'delivered',
+    });
+    expect(mockUserFindByIdAndUpdate).toHaveBeenCalledWith(
+      'ref1',
+      expect.objectContaining({
+        $inc: { loyaltyPoints: 100 },
+        $push: {
+          loyaltyHistory: expect.objectContaining({ action: 'Referral first order bonus', points: 100, orderId: 'order1' }),
+        },
+      })
+    );
+  });
+
+  test('referred customer SECOND delivered order → no referrer bonus', async () => {
+    makeOrder();
+    makeCustomer('ref1');
+    mockOrderCountDocuments.mockResolvedValue(2);
+
+    await updateOrderStatus(mockRequest({ body: { status: 'delivered' } }), res, next);
+
+    expect(mockUserFindByIdAndUpdate).not.toHaveBeenCalledWith(
+      'ref1',
+      expect.objectContaining({ $inc: { loyaltyPoints: 100 } })
+    );
+  });
+
+  test('customer without referral → no referrer bonus lookup for count', async () => {
+    makeOrder();
+    makeCustomer(null);
+
+    await updateOrderStatus(mockRequest({ body: { status: 'delivered' } }), res, next);
+
+    expect(mockOrderCountDocuments).not.toHaveBeenCalled();
+    expect(mockUserFindByIdAndUpdate).not.toHaveBeenCalledWith(
+      'ref1',
+      expect.objectContaining({ $inc: { loyaltyPoints: 100 } })
+    );
   });
 });
 

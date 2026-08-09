@@ -30,6 +30,7 @@ const getAdminStoreId = async (user) => {
 };
 
 const LOYALTY_POINTS_PER_100_TAKA = 1;
+const REFERRAL_FIRST_ORDER_BONUS = 100;
 
 const grantOrderLoyaltyPoints = async (order) => {
   const earned = Math.floor((order.totalAmount || 0) / 100) * LOYALTY_POINTS_PER_100_TAKA;
@@ -41,6 +42,31 @@ const grantOrderLoyaltyPoints = async (order) => {
       loyaltyHistory: {
         action: 'Order delivered',
         points: earned,
+        orderId: order._id,
+        date: Date.now(),
+      },
+    },
+  });
+};
+
+const grantReferralFirstOrderBonus = async (order) => {
+  if (!order.customer) return;
+
+  const customer = await User.findById(order.customer._id).select('referredBy');
+  if (!customer?.referredBy) return;
+
+  const deliveredCount = await Order.countDocuments({
+    customer: order.customer._id,
+    orderStatus: 'delivered',
+  });
+  if (deliveredCount > 1) return;
+
+  await User.findByIdAndUpdate(customer.referredBy, {
+    $inc: { loyaltyPoints: REFERRAL_FIRST_ORDER_BONUS },
+    $push: {
+      loyaltyHistory: {
+        action: 'Referral first order bonus',
+        points: REFERRAL_FIRST_ORDER_BONUS,
         orderId: order._id,
         date: Date.now(),
       },
@@ -392,6 +418,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
   if (status === 'delivered') {
     await grantOrderLoyaltyPoints(order);
+    await grantReferralFirstOrderBonus(order);
   }
 
   if (status === 'shipped' && order.customer) {
