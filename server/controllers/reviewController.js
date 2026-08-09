@@ -23,7 +23,13 @@ const assertReviewStoreAccess = async (review, user) => {
 };
 
 export const createReview = asyncHandler(async (req, res) => {
-  const { productId, rating, comment } = req.body;
+  const productId = req.body.productId || req.body.product;
+  const { rating, comment } = req.body;
+
+  if (!productId) {
+    res.status(400);
+    throw new Error('Product ID is required');
+  }
   
   // Check if user has ordered and it's delivered
   const order = await Order.findOne({
@@ -48,7 +54,49 @@ export const createReview = asyncHandler(async (req, res) => {
   });
 
   await review.save();
+  order.isReviewed = true;
+  await order.save();
   res.status(201).json({ success: true, message: 'Review submitted, pending approval' });
+});
+
+export const getAllReviews = asyncHandler(async (req, res) => {
+  let query = {};
+
+  if (req.user.role !== 'superAdmin') {
+    const store = await Store.findOne({ owner: req.user._id }).select('_id');
+    if (!store) {
+      const error = new Error('Store not found for this admin');
+      error.statusCode = 403;
+      throw error;
+    }
+    query.store = store._id;
+  }
+
+  const reviews = await Review.find(query)
+    .sort({ createdAt: -1 })
+    .populate('user', 'name')
+    .populate('product', 'name');
+
+  const mapped = reviews.map((r) => ({
+    ...r.toObject(),
+    comment: r.body,
+    status: r.isApproved ? 'approved' : r.adminNote ? 'rejected' : 'pending',
+  }));
+
+  res.status(200).json({ success: true, reviews: mapped });
+});
+
+export const deleteReview = asyncHandler(async (req, res) => {
+  const review = await Review.findById(req.params.id);
+  if (!review) {
+    res.status(404);
+    throw new Error('Review not found');
+  }
+
+  await assertReviewStoreAccess(review, req.user);
+
+  await review.remove();
+  res.status(200).json({ success: true, message: 'Review deleted' });
 });
 
 export const getProductReviews = asyncHandler(async (req, res) => {
