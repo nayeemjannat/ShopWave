@@ -62,7 +62,8 @@ export const getReferralInfo = asyncHandler(async (req, res) => {
     referralCode: user.referralCode,
     referralUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/register?ref=${user.referralCode}`,
     referralCount: count,
-    totalEarned: count * 50 // Example 50 points
+    referredCount: count,
+    totalEarned: count * 50 // 50 points per successful referral (REFERRAL_BONUS_POINTS)
   });
 });
 

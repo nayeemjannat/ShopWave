@@ -218,7 +218,7 @@ describe('GET /api/v1/users/referrals — referral info (Phase 8)', () => {
     next = jest.fn();
   });
 
-  test('returns referral code, url and count', async () => {
+test('returns referral code, url and count', async () => {
     mockUserFindById.mockResolvedValue({ _id: 'user1', referralCode: 'ABC123' });
     mockUserCountDocuments.mockResolvedValue(2);
 
@@ -231,8 +231,29 @@ describe('GET /api/v1/users/referrals — referral info (Phase 8)', () => {
         referralCode: 'ABC123',
         referralUrl: expect.stringContaining('/register?ref=ABC123'),
         referralCount: 2,
+        referredCount: 2,
         totalEarned: 100,
       })
     );
+  });
+
+  test('no referrals yet → referredCount 0, still 200 with code+url', async () => {
+    mockUserFindById.mockResolvedValue({ _id: 'user1', referralCode: 'ABC123' });
+    mockUserCountDocuments.mockResolvedValue(0);
+
+    await getReferralInfo(mockRequest(), res, next);
+
+    expect(mockUserCountDocuments).toHaveBeenCalledWith({ referredBy: 'user1' });
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        referralCode: 'ABC123',
+        referralUrl: expect.stringContaining('/register?ref=ABC123'),
+        referralCount: 0,
+        referredCount: 0,
+        totalEarned: 0,
+      })
+    );
+    expect(next).not.toHaveBeenCalled();
   });
 });
