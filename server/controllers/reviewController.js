@@ -27,8 +27,9 @@ export const createReview = asyncHandler(async (req, res) => {
   const { rating, comment } = req.body;
 
   if (!productId) {
-    res.status(400);
-    throw new Error('Product ID is required');
+    const error = new Error('Product ID is required');
+    error.statusCode = 400;
+    throw error;
   }
   
   // Check if user has ordered and it's delivered
@@ -39,8 +40,9 @@ export const createReview = asyncHandler(async (req, res) => {
   });
 
   if (!order) {
-    res.status(400);
-    throw new Error('You can only review products you have purchased and received');
+    const error = new Error('You must purchase before reviewing');
+    error.statusCode = 403;
+    throw error;
   }
 
   const review = new Review({
