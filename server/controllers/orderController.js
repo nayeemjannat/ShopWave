@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import Cart from '../models/Cart.js';
@@ -16,6 +16,7 @@ import sendEmail, { orderConfirmationTemplate, orderShippedTemplate } from '../u
 import sendWhatsApp from '../utils/sendWhatsApp.js';
 import { generateOrderInvoice } from '../utils/invoiceGenerator.js';
 import Store from '../models/Store.js';
+import User from '../models/User.js';
 
 const getAdminStoreId = async (user) => {
   if (user.role === 'superAdmin') return null;
@@ -26,6 +27,25 @@ const getAdminStoreId = async (user) => {
     throw error;
   }
   return store._id;
+};
+
+const LOYALTY_POINTS_PER_100_TAKA = 1;
+
+const grantOrderLoyaltyPoints = async (order) => {
+  const earned = Math.floor((order.totalAmount || 0) / 100) * LOYALTY_POINTS_PER_100_TAKA;
+  if (earned <= 0 || !order.customer) return;
+
+  await User.findByIdAndUpdate(order.customer._id, {
+    $inc: { loyaltyPoints: earned },
+    $push: {
+      loyaltyHistory: {
+        action: 'Order delivered',
+        points: earned,
+        orderId: order._id,
+        date: Date.now(),
+      },
+    },
+  });
 };
 
 const restoreOrderStock = async (order, session = null) => {
@@ -370,6 +390,10 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   order.orderStatus = status;
   await order.save();
 
+  if (status === 'delivered') {
+    await grantOrderLoyaltyPoints(order);
+  }
+
   if (status === 'shipped' && order.customer) {
     await sendEmail({
       to: order.customer.email,
@@ -380,3 +404,11 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
   res.status(200).json({ success: true, order });
 });
+
+
+
+
+
+
+
+

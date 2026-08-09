@@ -71,6 +71,10 @@ jest.unstable_mockModule('../models/Store.js', () => ({
   default: { findById: jest.fn() },
 }));
 
+jest.unstable_mockModule('../models/User.js', () => ({
+  default: { findByIdAndUpdate: jest.fn() },
+}));
+
 /* ---------- imports ---------- */
 
 const Product = (await import('../models/Product.js')).default;

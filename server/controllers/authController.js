@@ -3,6 +3,8 @@ import User from '../models/User.js';
 import sendEmail, { passwordResetTemplate } from '../utils/sendEmail.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
+const REFERRAL_BONUS_POINTS = 50;
+
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   
@@ -13,11 +15,14 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   let referredBy;
-  if (req.query.ref) {
-    const referrer = await User.findOne({ referralCode: req.query.ref });
+  let referrer;
+  const refCode = req.body.referralCode || req.query.ref;
+  if (refCode) {
+    referrer = await User.findOne({ referralCode: refCode });
     if (!referrer) {
-      res.status(400);
-      throw new Error('Invalid referral code');
+      const error = new Error('Invalid referral code');
+      error.statusCode = 400;
+      throw error;
     }
     referredBy = referrer._id;
   }
@@ -25,6 +30,19 @@ export const register = asyncHandler(async (req, res) => {
   const user = new User({ name, email, password, referredBy });
   user.referralCode = user.generateReferralCode();
   await user.save();
+
+  if (referrer) {
+    await User.findByIdAndUpdate(referrer._id, {
+      $inc: { loyaltyPoints: REFERRAL_BONUS_POINTS },
+      $push: {
+        loyaltyHistory: {
+          action: 'Referral bonus',
+          points: REFERRAL_BONUS_POINTS,
+          date: Date.now(),
+        },
+      },
+    });
+  }
 
   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
   const isProd = process.env.NODE_ENV === 'production';
