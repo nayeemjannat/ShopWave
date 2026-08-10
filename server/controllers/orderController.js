@@ -350,14 +350,16 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-  if (order.customer.toString() !== req.user._id.toString() && req.user.role !== 'superAdmin') {
-    res.status(403);
-    throw new Error('Not authorized to cancel this order');
+if (order.customer.toString() !== req.user._id.toString() && req.user.role !== 'superAdmin') {
+    const err = new Error('Not authorized to cancel this order');
+    err.statusCode = 403;
+    throw err;
   }
 
   if (order.orderStatus !== 'pending' && order.orderStatus !== 'processing') {
-    res.status(400);
-    throw new Error('Order cannot be cancelled at this stage');
+    const err = new Error('Order cannot be cancelled at this stage');
+    err.statusCode = 400;
+    throw err;
   }
 
   order.orderStatus = 'cancelled';
@@ -431,6 +433,9 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
   res.status(200).json({ success: true, order });
 });
+
+
+
 
 
 
