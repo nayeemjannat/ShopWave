@@ -90,8 +90,13 @@ export const validateCoupon = asyncHandler(async (req, res) => {
     throw new Error('Store ID and coupon code are required');
   }
 
-  const coupon = await Coupon.findOne({ code: code.toUpperCase(), store: activeStoreId, isActive: true });
-  const validation = coupon?.isValid(req.user._id, Number(cartTotal));
+let validation;
+  try {
+    const coupon = await Coupon.findOne({ code: code.toUpperCase(), store: activeStoreId, isActive: true });
+    validation = coupon?.isValid(req.user._id, Number(cartTotal));
+  } catch (err) {
+    validation = { valid: false, message: err.message || 'Invalid or expired coupon' };
+  }
 
   if (!coupon || !validation?.valid) {
     res.status(400);
@@ -243,7 +248,7 @@ export const sslcommerzSuccess = asyncHandler(async (req, res) => {
       return res.redirect(`${clientUrl}/order-failure`);
     }
 
-    if (amount && Number(amount) !== Number(order.totalAmount)) {
+if (Number(amount) !== Number(order.totalAmount)) {
       return res.redirect(`${clientUrl}/order-failure`);
     }
 
@@ -337,8 +342,7 @@ export const getOrderInvoice = asyncHandler(async (req, res) => {
     order.invoiceUrl = invoiceUrl;
     await order.save();
     res.status(200).json({ success: true, invoiceUrl });
-  } catch (err) {
-    res.status(500);
+} catch (err) {
     throw new Error('Invoice generation failed: ' + err.message);
   }
 });
@@ -350,10 +354,19 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-if (order.customer.toString() !== req.user._id.toString() && req.user.role !== 'superAdmin') {
-    const err = new Error('Not authorized to cancel this order');
-    err.statusCode = 403;
-    throw err;
+  if (order.customer._id.toString() !== req.user._id.toString() && req.user.role !== 'superAdmin') {
+    if (req.user.role === 'storeAdmin') {
+      const adminStoreId = await Store.findOne({ owner: req.user._id }).select('_id');
+      if (!adminStoreId || order.store.toString() !== adminStoreId.toString()) {
+        const err = new Error('Not authorized to cancel this order');
+        err.statusCode = 403;
+        throw err;
+      }
+    } else {
+      const err = new Error('Not authorized to cancel this order');
+      err.statusCode = 403;
+      throw err;
+    }
   }
 
   if (order.orderStatus !== 'pending' && order.orderStatus !== 'processing') {
@@ -365,7 +378,6 @@ if (order.customer.toString() !== req.user._id.toString() && req.user.role !== '
   order.orderStatus = 'cancelled';
   await order.save();
   await restoreOrderStock(order);
-
   res.status(200).json({ success: true, message: 'Order cancelled successfully' });
 });
 
